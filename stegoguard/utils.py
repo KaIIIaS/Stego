@@ -50,6 +50,8 @@ def collect_files(paths: Iterable[str], recursive: bool = False, all_files: bool
             for root, _dirs, files in walker:
                 for f in sorted(files):
                     full = os.path.join(root, f)
+                    if os.path.islink(full):
+                        continue
                     if os.path.isfile(full) and (all_files or os.path.splitext(f)[1].lower() in SUPPORTED_EXT):
                         out.append(full)
         elif os.path.isfile(p):

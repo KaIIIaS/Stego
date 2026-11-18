@@ -1,8 +1,10 @@
+import glob
 import json
 import os
 import tempfile
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 from stegoguard.analyzer import Analyzer
 from stegoguard.attacks import assess_attacks
@@ -77,6 +79,17 @@ class ReportsCliMonitorTest(unittest.TestCase):
         self.assertEqual(main(["analyze", self.bad]), 2)
         self.assertEqual(main(["analyze", os.path.join(self.d, "nope.png")]), 3)
 
+    def test_file_size_limit(self):
+        cfg = Config()
+        cfg.max_file_size_mb = 1
+        p = os.path.join(self.d, "big.bin")
+        with open(p, "wb") as fh:
+            fh.truncate(1024 * 1024 + 1)
+        r = Analyzer(cfg).analyze_file(p)
+        self.assertEqual(r["verdict"], "ERROR")
+        self.assertEqual(r["error_code"], "FILE_TOO_LARGE")
+        self.assertEqual(r["file_size"], 1024 * 1024 + 1)
+
     def test_monitor_quarantine(self):
         q = os.path.join(self.d, "q")
         ok = os.path.join(self.d, "ok")
@@ -84,9 +97,44 @@ class ReportsCliMonitorTest(unittest.TestCase):
         mon = FolderMonitor(Analyzer(), os.path.dirname(self.clean), interval=0.01, quarantine_dir=q,
                             clean_dir=ok, history=hist)
         mon.run(stop_event=threading.Event(), max_cycles=3)
-        self.assertTrue(os.path.exists(os.path.join(q, "bad.png")))
-        self.assertTrue(os.path.exists(os.path.join(ok, "clean.png")))
+        self.assertEqual(len(glob.glob(os.path.join(q, "bad_*.png"))), 1)
+        self.assertEqual(len(glob.glob(os.path.join(ok, "clean_*.png"))), 1)
         self.assertEqual(sum(hist.stats().values()), 2)
+
+    def test_monitor_does_not_overwrite_same_names(self):
+        q = os.path.join(self.d, "q2")
+        hist = History(os.path.join(self.d, "h2.db"))
+        mon = FolderMonitor(Analyzer(), self.d, interval=0.01, quarantine_dir=q, history=hist)
+        data = camera_png(9, 160, 200)
+        paths = []
+        for sub in ("a", "b"):
+            folder = os.path.join(self.d, sub)
+            os.makedirs(folder)
+            p = os.path.join(folder, "same.png")
+            with open(p, "wb") as fh:
+                fh.write(append_trailing(data, os.urandom(1000 + len(sub))))
+            paths.append(p)
+        for p in paths:
+            mon.process(p)
+        self.assertEqual(len(glob.glob(os.path.join(q, "same_*.png"))), 2)
+        with open(os.path.join(q, "manifest.jsonl"), encoding="utf-8") as fh:
+            self.assertEqual(len([json.loads(line) for line in fh if line.strip()]), 2)
+
+    def test_monitor_concurrent_same_names(self):
+        q = os.path.join(self.d, "q3")
+        mon = FolderMonitor(Analyzer(), self.d, quarantine_dir=q)
+        data = camera_png(9, 160, 200)
+        paths = []
+        for sub in ("c", "d"):
+            folder = os.path.join(self.d, sub)
+            os.makedirs(folder)
+            p = os.path.join(folder, "parallel.png")
+            with open(p, "wb") as fh:
+                fh.write(append_trailing(data, os.urandom(1000 + len(sub))))
+            paths.append(p)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(mon.process, paths))
+        self.assertEqual(len(glob.glob(os.path.join(q, "parallel_*.png"))), 2)
 
 
 if __name__ == "__main__":

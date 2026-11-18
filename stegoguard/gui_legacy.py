@@ -32,7 +32,7 @@ def run_gui(cfg: Optional[Config] = None) -> None:
 
     results: Dict[str, Dict] = {}; files: List[str] = []; q: queue.Queue = queue.Queue(); busy = tk.BooleanVar(value=False)
     header = ttk.Frame(root, style="Header.TFrame", padding=(22, 16)); header.pack(fill="x")
-    ttk.Label(header, text="STEGOguard", style="Header.TLabel").pack(anchor="w")
+    ttk.Label(header, text="СтегоВизор", style="Header.TLabel").pack(anchor="w")
     ttk.Label(header, text="Локальный анализ файлов · обработка без браузера и сетевых подключений", style="Sub.TLabel").pack(anchor="w", pady=(3,0))
     toolbar = ttk.Frame(root, padding=(16, 12)); toolbar.pack(fill="x")
     rob_var=tk.BooleanVar(value=False); att_var=tk.BooleanVar(value=False); pdf_password=tk.StringVar(value="")

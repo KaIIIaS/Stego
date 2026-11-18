@@ -44,6 +44,12 @@
     "sanitize_remove_hidden_text": true
   },
   "analysis_max_pixels": 4000000,
+  "max_file_size_mb": 512,
+  "max_decompressed_mb": 256,
+  "max_image_pixels": 64000000,
+  "max_archive_depth": 3,
+  "max_nested_files": 1000,
+  "max_analysis_seconds": 300,
   "seed": 20240901,
   "include_alpha": false,
   "db_path": "stegoguard_history.db",

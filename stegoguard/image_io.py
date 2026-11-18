@@ -82,20 +82,25 @@ class ImageData:
         self.to_pil().save(path, format="PNG")
 
 
-def _open(src: PathOrImage) -> Image.Image:
+def _open(src: PathOrImage, max_pixels: Optional[int] = None) -> Image.Image:
     if isinstance(src, Image.Image):
-        return src
-    if isinstance(src, (bytes, bytearray)):
+        img = src
+    elif isinstance(src, (bytes, bytearray)):
         img = Image.open(io.BytesIO(src))
     else:
         img = Image.open(src)
+    if max_pixels and img.width * img.height > max_pixels:
+        raise UnsupportedImageError(
+            f"Изображение {img.width}x{img.height} превышает лимит {max_pixels} пикселей"
+        )
     img.load()
     return img
 
 
-def load_image(src: PathOrImage, include_alpha: bool = False) -> ImageData:
+def load_image(src: PathOrImage, include_alpha: bool = False,
+               max_pixels: Optional[int] = None) -> ImageData:
     try:
-        img = _open(src)
+        img = _open(src, max_pixels=max_pixels)
     except Exception as exc:  # noqa: BLE001
         raise UnsupportedImageError(f"Не удалось декодировать изображение: {exc}") from exc
 

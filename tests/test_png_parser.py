@@ -60,6 +60,11 @@ class PNGParserTest(unittest.TestCase):
     def test_idat_extra(self):
         self.assertIn("ZLIB_TRAILING", codes(parse_png(inject_idat_extra(self.clean, os.urandom(300)))))
 
+    def test_decompression_limit(self):
+        st = parse_png(self.clean, max_decompressed_bytes=10)
+        self.assertIn("DECOMPRESSION_LIMIT", codes(st))
+        self.assertEqual(st.max_severity, "critical")
+
     def test_expected_size_interlaced(self):
         self.assertEqual(expected_raw_size(8, 8, 8, 2, 0), 8 * (1 + 24))
         # Adam7 для 1x1: единственный проход 1

@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+DEFAULT_MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024
 
 KNOWN_CHUNKS = {
     b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS", b"cHRM", b"gAMA", b"iCCP", b"sBIT",
@@ -219,11 +220,18 @@ def _decode_text_chunk(ctype: bytes, data: bytes) -> Tuple[str, bytes, Optional[
         return "?", b"", f"ошибка декодирования: {exc}"
 
 
-def parse_png(src, thresholds=None) -> PNGStructure:
-    """Разбор PNG-файла (путь или bytes) с выявлением структурных аномалий."""
+def parse_png(src, thresholds=None, max_decompressed_bytes=None) -> PNGStructure:
+    """Разбор PNG-файла (путь или bytes) с выявлением структурных аномалий.
+
+    max_decompressed_bytes ограничивает объём распаковки IDAT (защита от
+    zlib-бомб). None означает безопасный предел по умолчанию.
+    """
     from .config import Thresholds
 
     thr = thresholds or Thresholds()
+    if max_decompressed_bytes is None:
+        max_decompressed_bytes = DEFAULT_MAX_DECOMPRESSED_BYTES
+    max_decompressed_bytes = max(1, int(max_decompressed_bytes))
     if isinstance(src, (bytes, bytearray)):
         data = bytes(src)
     else:
@@ -269,7 +277,7 @@ def parse_png(src, thresholds=None) -> PNGStructure:
     _check_ihdr_plte(st)
     _check_unknown_and_sizes(st, thr)
     _check_text(st, thr)
-    _check_idat(st)
+    _check_idat(st, max_decompressed_bytes)
     _check_trailing(st, trailing, pos, thr)
     return st
 
@@ -389,7 +397,7 @@ def _check_text(st: PNGStructure, thr) -> None:
             st.add("TEXT_METADATA", "info", f"Текстовые метаданные «{key}»", preview[:60], c.offset)
 
 
-def _check_idat(st: PNGStructure) -> None:
+def _check_idat(st: PNGStructure, max_decompressed_bytes: int) -> None:
     idats = [c for c in st.chunks if c.type == "IDAT"]
     if not idats:
         return
@@ -397,8 +405,20 @@ def _check_idat(st: PNGStructure) -> None:
     st.idat_total = len(stream)
     try:
         d = zlib.decompressobj()
-        raw = d.decompress(stream)
+        raw = d.decompress(stream, max_decompressed_bytes + 1)
+        if len(raw) > max_decompressed_bytes:
+            st.decompressed_size = len(raw)
+            st.add("DECOMPRESSION_LIMIT", "critical", "Превышен лимит распаковки IDAT",
+                   f"Поток распакован более чем на {max_decompressed_bytes} байт; "
+                   "анализ остановлен для защиты памяти", idats[0].offset)
+            return
         raw += d.flush()
+        if len(raw) > max_decompressed_bytes:
+            st.decompressed_size = len(raw)
+            st.add("DECOMPRESSION_LIMIT", "critical", "Превышен лимит распаковки IDAT",
+                   f"Поток распакован более чем на {max_decompressed_bytes} байт; "
+                   "анализ остановлен для защиты памяти", idats[0].offset)
+            return
         extra = d.unused_data
         if not d.eof:
             st.add("ZLIB_TRUNCATED", "high", "Незавершённый zlib-поток IDAT")

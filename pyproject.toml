@@ -10,8 +10,24 @@ readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["numpy>=1.22", "scipy>=1.8", "Pillow>=9.0", "matplotlib>=3.5", "pypdf>=4.0", "customtkinter>=5.2"]
 
+[project.optional-dependencies]
+dev = ["ruff>=0.6", "mypy>=1.10"]
+
 [project.scripts]
 stegoguard = "stegoguard.cli:main"
 
 [tool.setuptools]
 packages = ["stegoguard", "stegoguard.analysis"]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+# На старте блокируем только синтаксис и неопределённые имена.
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.mypy]
+python_version = "3.9"
+ignore_missing_imports = true
+check_untyped_defs = false

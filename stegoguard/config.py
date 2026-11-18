@@ -57,11 +57,26 @@ class Config:
     robustness: RobustnessSettings = field(default_factory=RobustnessSettings)
     pdf: PdfSettings = field(default_factory=PdfSettings)
     analysis_max_pixels: int = 4_000_000
+    # Защита от файлов-бомб и исчерпания памяти
+    max_file_size_mb: int = 512
+    max_decompressed_mb: int = 256
+    max_image_pixels: int = 64_000_000
+    max_archive_depth: int = 3
+    max_nested_files: int = 1000
     seed: int = 20240901
+    max_analysis_seconds: int = 300
     include_alpha: bool = False
     db_path: str = "stegoguard_history.db"
     log_level: str = "INFO"
     log_file: Optional[str] = None
+
+    @property
+    def max_file_size_bytes(self) -> int:
+        return int(self.max_file_size_mb) * 1024 * 1024
+
+    @property
+    def max_decompressed_bytes(self) -> int:
+        return int(self.max_decompressed_mb) * 1024 * 1024
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -102,6 +117,14 @@ class Config:
             raise ValueError("pdf.max_objects >= 1, pdf.max_stream_bytes >= 1024, pdf.max_attachments >= 1")
         if p.max_pages < 0 or p.max_images < 0 or p.max_text_chars < 0:
             raise ValueError("Параметры pdf.max_pages/max_images/max_text_chars не могут быть отрицательными")
+        if self.max_file_size_mb < 1 or self.max_decompressed_mb < 1:
+            raise ValueError("max_file_size_mb >= 1 и max_decompressed_mb >= 1")
+        if self.analysis_max_pixels < 1 or self.max_image_pixels < 1:
+            raise ValueError("analysis_max_pixels >= 1 и max_image_pixels >= 1")
+        if self.max_archive_depth < 0 or self.max_nested_files < 1:
+            raise ValueError("max_archive_depth >= 0 и max_nested_files >= 1")
+        if self.max_analysis_seconds < 1:
+            raise ValueError("max_analysis_seconds >= 1")
 
     @classmethod
     def load(cls, path: Optional[str] = None) -> "Config":

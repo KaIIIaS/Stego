@@ -33,3 +33,7 @@ logs/
 # Temporary
 temp/
 tmp/
+
+# Backup and safe files
+*.backup.docx
+*.docx

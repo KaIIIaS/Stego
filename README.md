@@ -1,8 +1,10 @@
-# StegoGuard 2.0
+# СтегоВизор 2.0
 
 **Автономный комплекс локального анализа файлов и стеганографических рисков для закрытых промышленных контуров.**
 
 Язык: Python 3.9+. Зависимости: numpy, scipy, Pillow, matplotlib, pypdf, customtkinter (GUI; при его отсутствии автоматически используется стандартный Tkinter). Сетевые подключения и браузер для работы не используются.
+
+План разработки и актуальные приоритеты: [ROADMAP.md](ROADMAP.md).
 
 ## Назначение
 
@@ -23,7 +25,7 @@ PNG хранит данные без потерь, поэтому это удо�
 
 ```bash
 pip install -r requirements.txt      # или: pip install .   (появится команда stegoguard)
-python run_tests.py                  # 45 автотестов
+python run_tests.py                  # 49 автотестов
 ```
 
 ## Быстрый старт
@@ -210,6 +212,8 @@ Accuracy 89.7%, Precision 100%, TPR 87%. Для LSB-замены граница 
 
 `python main.py init-config config.json` сохраняет параметры по умолчанию (пороги, доли и число
 испытаний для оценки стойкости, максимальный размер анализируемого фрагмента, путь к журналу).
+Лимиты приёма файлов: `max_file_size_mb`, `max_decompressed_mb`, `max_image_pixels`;
+резерв под будущий разбор архивов: `max_archive_depth`, `max_nested_files`.
 Секция `pdf` задаёт лимиты разбора (`max_objects`, `max_stream_bytes`, `max_attachments`, `max_pages`,
 `max_images`, `full_image_analysis`, `max_text_chars`) и параметры санитизации
 (`sanitize_reencode_images`, `sanitize_remove_hidden_text`).

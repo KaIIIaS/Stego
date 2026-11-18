@@ -587,15 +587,15 @@ def run_gui(cfg: Optional[Config] = None) -> None:
     logo = ctk.CTkFrame(brand, width=46, height=46, fg_color=PRIMARY, corner_radius=13)
     logo.pack(side="left")
     logo.pack_propagate(False)
-    ctk.CTkLabel(logo, text="SG", font=(UI_FONT, 15, "bold"),
+    ctk.CTkLabel(logo, text="СВ", font=(UI_FONT, 15, "bold"),
                  text_color="#FFFFFF").place(relx=0.5, rely=0.5, anchor="center")
     brand_text = ctk.CTkFrame(brand, fg_color="transparent")
     brand_text.pack(side="left", padx=(12, 0))
     title_row = ctk.CTkFrame(brand_text, fg_color="transparent")
     title_row.pack(anchor="w")
-    ctk.CTkLabel(title_row, text="Stego", font=(UI_FONT, 21, "bold"),
+    ctk.CTkLabel(title_row, text="Стего", font=(UI_FONT, 21, "bold"),
                  text_color="#FFFFFF").pack(side="left")
-    ctk.CTkLabel(title_row, text="Guard", font=(UI_FONT, 21, "bold"),
+    ctk.CTkLabel(title_row, text="Визор", font=(UI_FONT, 21, "bold"),
                  text_color="#60A5FA").pack(side="left")
     ctk.CTkLabel(brand_text, text="Локальный анализ файлов и стеганографических рисков",
                  font=(UI_FONT, 10), text_color="#94A3B8").pack(anchor="w", pady=(1, 0))

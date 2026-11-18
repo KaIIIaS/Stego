@@ -2,6 +2,9 @@
 
 Коды возврата (для интеграции в SCADA/АСУ ТП, CI и шлюзы):
   0 - скрытых вложений не выявлено; 1 - подозрительно; 2 - обнаружено вложение; 3 - ошибка.
+
+Внимание: передача пароля через --password видна в списке процессов (ps, top).
+Рекомендуется использовать --password-stdin для безопасной передачи.
 """
 from __future__ import annotations
 
@@ -10,6 +13,8 @@ import json
 import os
 import sys
 from typing import List, Optional
+
+import getpass
 
 from . import __app_name__, __version__
 from .analyzer import Analyzer
@@ -57,6 +62,20 @@ def _looks_like_pdf(path: str) -> bool:
         return False
 
 
+def _get_password(args) -> Optional[str]:
+    """Получить пароль из аргументов или stdin.
+    
+    Приоритет: --password-stdin > --password > интерактивный ввод.
+    --password-виден в процессе, --password-stdin безопаснее.
+    """
+    if getattr(args, "password_stdin", None):
+        return getpass.getpass("Введите пароль для расшифрованного PDF (не будет сохранен): ")
+    pw = getattr(args, "password", None)
+    if pw:
+        print("ВНИМАНИЕ: пароль будет виден в списке процессов (ps, top)", file=sys.stderr)
+    return pw
+
+
 def cmd_analyze(args, cfg: Config) -> int:
     files = collect_files(args.paths, recursive=args.recursive, all_files=args.all_files)
     if not files:
@@ -70,7 +89,7 @@ def cmd_analyze(args, cfg: Config) -> int:
     results = []
     for i, f in enumerate(files, 1):
         r = analyzer.analyze_file(f, robustness=args.robustness, attacks=args.attacks,
-                                  password=getattr(args, "password", None))
+                                  password=_get_password(args))
         results.append(r)
         if history:
             history.add(r)
@@ -166,7 +185,7 @@ def cmd_sanitize(args, cfg: Config) -> int:
             from .pdf_sanitizer import sanitize_pdf
             dst = os.path.join(args.output, os.path.basename(f)) if multi else args.output
             rep = sanitize_pdf(
-                f, dst, password=getattr(args, "password", None),
+                f, dst, password=_get_password(args),
                 reencode_images=not getattr(args, "pdf_no_images", False),
                 remove_hidden_text=not getattr(args, "pdf_keep_hidden_text", False),
             )
@@ -189,7 +208,7 @@ def cmd_sanitize(args, cfg: Config) -> int:
 
 def cmd_pdf_extract(args, cfg: Config) -> int:
     from .pdf_analyzer import extract_pdf_attachments
-    written = extract_pdf_attachments(args.pdf, args.output, password=args.password,
+    written = extract_pdf_attachments(args.pdf, args.output, password=_get_password(args),
                                       limit=args.limit)
     if not written:
         print("Вложенные файлы не найдены")
@@ -207,7 +226,7 @@ def cmd_monitor(args, cfg: Config) -> int:
     history = History(args.db or cfg.db_path)
     mon = FolderMonitor(Analyzer(cfg), args.folder, args.interval, args.recursive, args.quarantine,
                         args.clean_dir, args.sanitize_dir, args.report_dir, history, args.quarantine_level,
-                        password=args.password)
+                        password=_get_password(args))
     try:
         mon.run(max_cycles=args.cycles)
     except KeyboardInterrupt:
@@ -278,7 +297,9 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("-o", "--report-dir", help="каталог для отчётов")
     a.add_argument("--formats", default="json,html,csv")
     a.add_argument("--db", nargs="?", const=True, help="записать результаты в журнал SQLite")
-    a.add_argument("--password", help="пароль зашифрованного PDF (не сохраняется в конфигурации)")
+    a.add_argument("--password", help="пароль зашифрованного PDF (не сохраняется в конфигурации; виден в процессе)");
+    a.add_argument("--password-stdin", action="store_true",
+                   help="читать пароль из stdin (безопаснее, не попадает в процесс)");
     a.add_argument("--json", action="store_true", help="вывод результата в JSON")
     a.add_argument("-v", "--verbose", action="store_true")
     a.set_defaults(func=cmd_analyze)
@@ -315,15 +336,18 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--lsb-mode", choices=["predictive", "random", "none"], default="predictive",
                    help="перезапись LSB: predictive - предсказательная (по умолчанию), random - случайная, none - не менять")
     s.add_argument("--alpha", action="store_true", help="обрабатывать также LSB альфа-канала")
-    s.add_argument("--password", help="пароль зашифрованного PDF (не сохраняется в конфигурации)")
+    s.add_argument("--password", help="пароль зашифрованного PDF (не сохраняется в конфигурации; виден в процессе)");
+    s.add_argument("--password-stdin", action="store_true",
+                   help="читать пароль из stdin (безопаснее, не попадает в процесс)");
     s.add_argument("--pdf-no-images", action="store_true", help="не перекодировать изображения PDF")
-    s.add_argument("--pdf-keep-hidden-text", action="store_true", help="не удалять скрытый текст PDF")
     s.set_defaults(func=cmd_sanitize)
 
     pe = sub.add_parser("pdf-extract", help="извлечь вложенные файлы PDF")
     pe.add_argument("pdf")
     pe.add_argument("-o", "--output", required=True, help="каталог для извлечённых файлов")
-    pe.add_argument("--password", help="пароль зашифрованного PDF")
+    pe.add_argument("--password", help="пароль зашифрованного PDF (не сохраняется в конфигурации; виден в процессе)");
+    pe.add_argument("--password-stdin", action="store_true",
+                   help="читать пароль из stdin (безопаснее, не попадает в процесс)");
     pe.add_argument("--limit", type=int, default=1000)
     pe.set_defaults(func=cmd_pdf_extract)
 
@@ -336,7 +360,9 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--clean-dir", help="куда перемещать проверенные чистые файлы")
     m.add_argument("--sanitize-dir", help="куда сохранять санитизированные копии")
     m.add_argument("--report-dir")
-    m.add_argument("--password", help="пароль зашифрованного PDF")
+    m.add_argument("--password", help="пароль зашифрованного PDF (не сохраняется в конфигурации; виден в процессе)");
+    m.add_argument("--password-stdin", action="store_true",
+                   help="читать пароль из stdin (безопаснее, не попадает в процесс)");
     m.add_argument("--db")
     m.add_argument("--cycles", type=int, help="число циклов опроса (по умолчанию бесконечно)")
     m.set_defaults(func=cmd_monitor)
